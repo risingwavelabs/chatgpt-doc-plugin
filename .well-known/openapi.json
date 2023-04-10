@@ -1,0 +1,146 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "RisingWave Doc Plugin API",
+        "description": "A plugin for answering questions based on natural language queries, related documents, metadata",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/query": {
+            "post": {
+                "summary": "Query",
+                "description": "Accept a questions about risingwave, fetch most related contents from docs",
+                "operationId": "query_query_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QueryRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Document": {
+                "title": "Document",
+                "required": [
+                    "page_content"
+                ],
+                "type": "object",
+                "properties": {
+                    "page_content": {
+                        "title": "Page Content",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "type": "object"
+                    }
+                },
+                "description": "Interface for interacting with a document."
+            },
+            "HTTPValidationError": {
+                "title": "HTTPValidationError",
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "title": "Detail",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        }
+                    }
+                }
+            },
+            "QueryRequest": {
+                "title": "QueryRequest",
+                "required": [
+                    "query"
+                ],
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "title": "Query",
+                        "type": "string"
+                    }
+                }
+            },
+            "QueryResponse": {
+                "title": "QueryResponse",
+                "required": [
+                    "result"
+                ],
+                "type": "object",
+                "properties": {
+                    "result": {
+                        "title": "Result",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Document"
+                        }
+                    }
+                }
+            },
+            "ValidationError": {
+                "title": "ValidationError",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "type": "object",
+                "properties": {
+                    "loc": {
+                        "title": "Location",
+                        "type": "array",
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "msg": {
+                        "title": "Message",
+                        "type": "string"
+                    },
+                    "type": {
+                        "title": "Error Type",
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
