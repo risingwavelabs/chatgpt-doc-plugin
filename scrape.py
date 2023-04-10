@@ -1,5 +1,6 @@
 import concurrent.futures
 import os
+import os.path as osp
 import re
 import urllib.request
 from collections import deque
@@ -10,14 +11,10 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-# Regex pattern to match a URL
-HTTP_URL_PATTERN = r'^http[s]*://.+'
-
-# Define root domain to crawl
-domain = "risingwave.dev"
-full_url = "https://risingwave.dev/docs/current/intro/"
-local_domain = urlparse(full_url).netloc
-
+HTTP_URL_PATTERN = r'^http[s]*://.+' # Regex pattern to match a URL
+WEBSITE_DUMP_DIRECTORY = "text" # Directory to dump raw bs4 output
+PROCESSED_CSV_DIRECTORY = "processed" # Directory to save processed CSV file
+ENTRY_POINTS = ["https://risingwave.dev/docs/current/intro/"] # Define website entry points
 
 # Create a class to parse the HTML and get the hyperlinks
 class HyperlinkParser(HTMLParser):
@@ -99,6 +96,9 @@ def remove_duplicate_newlines(s):
 def scrape_page(url: str):
     print(url)  # for debugging and to see the progress
 
+    # Get local domain
+    local_domain = urlparse(url).netloc
+
     # Get the text from the URL using BeautifulSoup
     try:
         resp = requests.get(url, timeout=1000)
@@ -122,9 +122,14 @@ def scrape_page(url: str):
             print("Unable to parse page " + url +
                   " due to JavaScript being required")
 
-    # Otherwise, write the text to the file in the text directory
+    # Otherwise, write the text to the file in the 'text' directory
+        # Create text/<local_domain> directory for HTML dump
+        sub_directory = osp.join(WEBSITE_DUMP_DIRECTORY, local_domain)
+        if not os.path.exists(sub_directory):
+            os.mkdir(sub_directory)
         # Save text from the url to a <url>.txt file
-        with open('text/'+local_domain+'/'+url[8:].replace("/", "_") + ".txt", "w", encoding="utf-8") as f:
+        file_name = url[8:].replace("/", "_") + ".txt"
+        with open(osp.join(sub_directory, file_name), "w", encoding="utf-8") as f:
             f.write(text)
     except Exception as e:
         print("err" + " " + e + " " + url)
@@ -140,18 +145,11 @@ def crawl(urls):
     seen = set(urls)
 
     # Create a directory to store the text files
-    if not os.path.exists("text/"):
-        os.mkdir("text/")
-
-    if not os.path.exists("text/"+local_domain+"/"):
-        os.mkdir("text/" + local_domain + "/")
-
-    # Create a directory to store the csv files
-    if not os.path.exists("processed"):
-        os.mkdir("processed")
+    if not os.path.exists(WEBSITE_DUMP_DIRECTORY):
+        os.mkdir(WEBSITE_DUMP_DIRECTORY)
 
     # While the queue is not empty, continue crawling
-    with concurrent.futures.ThreadPoolExecutor() as excutor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as excutor:
         while queue:
             futures = [excutor.submit(scrape_page, url) for url in queue]
             queue = []
@@ -179,11 +177,18 @@ def remove_newlines(serie):
 
 
 def to_csv():
+    # Create a directory to store the csv files
+    if not os.path.exists(PROCESSED_CSV_DIRECTORY):
+        os.mkdir(PROCESSED_CSV_DIRECTORY)
     texts = []
-    for file in os.listdir("text/" + domain + "/"):
-        with open("text/" + domain + "/" + file, "r", encoding="UTF-8") as f:
-            text = f.read()
-            texts.append((file[:-4], text))
+    for domain in os.listdir(WEBSITE_DUMP_DIRECTORY):
+        domain_dump = osp.join(WEBSITE_DUMP_DIRECTORY, domain)
+        for fname in os.listdir(domain_dump):
+            site_dump = osp.join(WEBSITE_DUMP_DIRECTORY, domain, fname)
+            site_id = site_dump[:-4] # remove .txt at the end
+            with open(site_dump, "r", encoding="UTF-8") as f:
+                text = f.read()
+                texts.append((site_id, text))
 
     df = pd.DataFrame(texts, columns=['fname', 'text'])
     df['text'] = df.fname + ". " + remove_newlines(df.text)
@@ -192,6 +197,6 @@ def to_csv():
 
 
 if __name__ == "__main__":
-    crawl([full_url])
+    crawl(ENTRY_POINTS)
     print("convert to csv....")
     to_csv()
